@@ -1,0 +1,323 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentCode": {
+      "type": "string",
+      "metadata": {
+        "description": "The environment 3 digits code"
+      },
+      "allowedValues": [
+        "dev",
+        "qas",
+        "stg",
+        "stg1",
+        "stg2",
+        "uat",
+        "prd",
+        "bcp"
+      ]
+    },
+    "projectCode": {
+      "type": "string",
+      "metadata": {
+        "description": "The project 3 digits code"
+      }
+    },
+    "functionCode": {
+      "type": "string",
+      "metadata": {
+        "description": "The function 3 digits code"
+      },
+      "allowedValues": [
+        "ena",
+        "adv"
+      ]
+    },
+    "workerPool": {
+      "type": "string",
+      "allowedValues": [
+        "1",
+        "2",
+        "3"
+      ],
+      "defaultValue": 0,
+      "metadata": {
+        "description": "Defines which worker pool's (WP1, WP2 or WP3) resources will be used for the app service plan."
+      }
+    },
+    "numberOfWorkersFromWorkerPool": {
+      "type": "int",
+      "defaultValue": 1,
+      "metadata": {
+        "description": "Defines the number of workers from the worker pool that will be used by the app service plan."
+      }
+    },
+    "logsRetentionDays": {
+      "type": "int",
+      "defaultValue": 0,
+      "metadata": {
+        "description": "Defines the number of logs rentetion days"
+      }
+    }
+  },
+  "variables": {
+    "environment": {
+      "dev": {
+        "char": "d",
+        "subscription": "FreeTrial",
+        "bcpLoop": 1,
+        "cert": "preprod",
+        "trafficManagerProfile": "False",
+        "stor1KvAssignmentRoleRandomGuid": "a52bd39e-42e7-42ed-b151-d317d3d1d639"
+      },
+      "qas": {
+        "char": "q",
+        "subscription": "preprod",
+        "bcpLoop": 1,
+        "cert": "preprod",
+        "trafficManagerProfile": "False",
+        "stor1KvAssignmentRoleRandomGuid": "521b9269-c318-49d4-a5b5-3af7e06b8051"
+      },
+      "loa": {
+        "char": "l",
+        "subscription": "preprod",
+        "bcpLoop": 1,
+        "cert": "preprod",
+        "trafficManagerProfile": "False",
+        "stor1KvAssignmentRoleRandomGuid": "e9b51c81-94fe-4b10-9e72-a85bd00d865d"
+      },
+      "stg": {
+        "char": "s",
+        "subscription": "prod",
+        "bcpLoop": 1,
+        "cert": "stg",
+        "trafficManagerProfile": "True",
+        "stor1KvAssignmentRoleRandomGuid": "d0dce7e4-f407-4037-8366-f7525c9a7a67"
+      },
+      "stg1": {
+        "char": "s1",
+        "subscription": "prod",
+        "bcpLoop": 1,
+        "cert": "stg1",
+        "trafficManagerProfile": "True",
+        "stor1KvAssignmentRoleRandomGuid": "d0dce7e4-f407-4037-8366-f7525c9a7a67"
+      },
+      "stg2": {
+        "char": "s2",
+        "subscription": "prod",
+        "bcpLoop": 1,
+        "cert": "stg2",
+        "trafficManagerProfile": "True",
+        "stor1KvAssignmentRoleRandomGuid": "d0dce7e4-f407-4037-8366-f7525c9a7a67"
+      },
+      "uat": {
+        "char": "u",
+        "subscription": "prod",
+        "bcpLoop": 1,
+        "cert": "uat",
+        "trafficManagerProfile": "True",
+        "stor1KvAssignmentRoleRandomGuid": "d0dce7e4-f407-4037-8366-f7525c9a7a67"
+      },
+      "prd": {
+        "char": "",
+        "subscription": "prod",
+        "bcpLoop": 1,
+        "cert": "prod",
+        "trafficManagerProfile": "True",
+        "stor1KvAssignmentRoleRandomGuid": "11ac3506-17da-4295-9a86-e0f2dbe76336"
+      },
+      "bcp": {
+        "char": "",
+        "subscription": "prod",
+        "bcpLoop": 2,
+        "cert": "prod",
+        "trafficManagerProfile": "False",
+        "stor1KvAssignmentRoleRandomGuid": "11ac3506-17da-4295-9a86-e0f2dbe76336"
+      }
+    },
+    "function": {
+      "ena": {
+        "fullname": "enabling"
+      },
+      "adv": {
+        "fullname": "advisory"
+      }
+    },
+    "environmentVariable": "[variables('environment')[parameters('environmentCode')]]",
+    "functionVariable": "[variables('function')[parameters('functionCode')]]",
+    "app1ServicePlanName": [
+      "[concat(variables('environmentVariable').char, parameters('projectCode'),'-eus-plan')]",
+      "[concat(variables('environmentVariable').char, parameters('projectCode'),'-wus-plan')]"
+    ],
+    "location": [
+      "East US",
+      "West US"
+    ],
+    "appServiceEnvironmentRgName": [
+      "[concat('AZRG-', toUpper(parameters('functionCode')), '-DAS-ASE-', toUpper(variables('environmentVariable').subscription), '-EUS')]",
+      "[concat('AZRG-', toUpper(parameters('functionCode')), '-DAS-ASE-', toUpper(variables('environmentVariable').subscription), '-WUS')]"
+    ],
+    "app1Name": [
+      "[concat(variables('environmentVariable').char, parameters('projectCode'),'-eus')]",
+      "[concat(variables('environmentVariable').char, parameters('projectCode'),'-wus')]"
+    ],
+    "appServiceEnvironmentName": [
+      "[concat(variables('functionVariable').fullname, '-das', if(equals(variables('environmentVariable').subscription, 'preprod'), '-ase2-preprod', '-ase2-prod'), '-eus')]",
+      "[concat(variables('functionVariable').fullname, '-das-ase-', variables('environmentVariable').subscription, '-wus')]"
+    ],
+    "app1InsightsName": "[concat(variables('environmentVariable').char, parameters('projectCode'),'-insights')]",
+    "logsRetentionEnabled": "[if(equals(parameters('logsRetentionDays'), 0), 'False', 'True')]",
+    "trafficManagerDnsName": "[concat(variables('environmentVariable').char, parameters('projectCode'),'-deloitte')]",
+    "app1HostName": [
+      "[concat(variables('app1Name')[0], '.ena.app.deloitte.com')]",
+      "[concat(variables('app1Name')[1], '.ena.app.deloitte.com')]"
+    ]
+  },
+  "resources": [
+    {
+      "apiVersion": "2014-04-01",
+      "name": "[variables('app1InsightsName')]",
+      "type": "Microsoft.Insights/components",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "applicationId": "[variables('app1InsightsName')]"
+      },
+      "dependsOn": []
+    },
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2016-09-01",
+      "name": "[variables('app1ServicePlanName')[copyIndex()]]",
+      "location": "[variables('location')[copyIndex()]]",
+      "properties": {
+        "name": "[variables('app1ServicePlanName')[copyIndex()]]"
+      },
+      "sku": {
+        "name": "[concat('B',parameters('workerPool'))]",
+        "tier": "Premium",
+        "size": "[concat('B',parameters('workerPool'))]",
+        "family": "I",
+        "capacity": "[parameters('numberOfWorkersFromWorkerPool')]"
+      },
+      "copy": {
+        "name": "app1ServicePlanBcpLoop",
+        "count": "[variables('environmentVariable').bcpLoop]"
+      },
+      "dependsOn": [
+        "[concat('Microsoft.Insights/components/',variables('app1InsightsName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2016-08-01",
+      "name": "[variables('app1Name')[copyIndex()]]",
+      "location": "[variables('location')[copyIndex()]]",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "name": "[variables('app1Name')[copyIndex()]]",
+        "serverFarmId": "[resourceId('Microsoft.Web/serverFarms',variables('app1ServicePlanName')[copyIndex()])]",
+        "siteConfig": {
+          "netFrameworkVersion": "v4.7",
+          "phpVersion": "",
+          "pythonVersion": "",
+          "javaVersion": "",
+          "nodeVersion": "",
+          "linuxFxVersion": "",
+          "use32BitWorkerProcess": "False",
+          "webSocketsEnabled": "False",
+          "alwaysOn": "True",
+          "managedPipelineMode": "Integrated",
+          "remoteDebuggingEnabled": "False",
+          "appSettings": [
+            {
+              "name": "APPINSIGHTS_INSTRUMENTATIONKEY",
+              "value": "[reference(concat('microsoft.insights/components/', variables('app1InsightsName'))).InstrumentationKey]"
+            }
+          ],
+          "connectionStrings": [],
+          "defaultDocuments": [],
+          "handlerMappings": [],
+          "virtualApplications": [
+            {
+              "virtualPath": "/",
+              "physicalPath": "site\\wwwroot",
+              "preloadEnabled": "True",
+              "virtualDirectories": ""
+            }
+          ],
+          "minTlsVersion": "1.2"
+        },
+        "clientAffinityEnabled": "False",
+        "siteAuthEnabled": "False",
+        "managedServiceIdentityId": "",
+        "httpsOnly": "True",
+        "push": "",
+        "localMySqlEnabled": "False",
+        "apiDefinition": "",
+        "cors": ""
+      },
+      "resources": [
+        {
+          "type": "siteextensions",
+          "apiVersion": "2016-08-01",
+          "name": "Microsoft.ApplicationInsights.AzureWebSites",
+          "dependsOn": [
+            "[concat('Microsoft.Web/sites/', variables('app1Name')[copyIndex()])]"
+          ],
+          "properties": {}
+        }
+      ],
+      "dependsOn": [
+        "[concat('Microsoft.Web/serverFarms/',variables('app1ServicePlanName')[copyIndex()])]"
+      ],
+      "copy": {
+        "name": "app1BcpLoop",
+        "count": "[variables('environmentVariable').bcpLoop]"
+      }
+    },
+    {
+      "type": "Microsoft.Network/trafficManagerProfiles",
+      "apiVersion": "2017-05-01",
+      "name": "[variables('trafficManagerDnsName')]",
+      "condition": "[equals(variables('environmentVariable').trafficManagerProfile,'True')]",
+      "location": "global",
+      "dependsOn": [],
+      "properties": {
+        "profileStatus": "Enabled",
+        "trafficRoutingMethod": "Priority",
+        "dnsConfig": {
+          "relativeName": "[variables('trafficManagerDnsName')]",
+          "ttl": 30
+        },
+        "monitorConfig": {
+          "protocol": "HTTPS",
+          "port": 443,
+          "path": "/"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Network/trafficManagerProfiles/ExternalEndpoints",
+      "apiVersion": "2017-05-01",
+      "name": "[concat(variables('trafficManagerDnsName'),'/Endpoint',copyIndex())]",
+      "condition": "[equals(variables('environmentVariable').subscription,'prod')]",
+      "location": "global",
+      "properties": {
+        "target": "[variables('app1HostName')[copyIndex()]]",
+        "endpointStatus": "Enabled",
+        "endpointLocation": "[variables('location')[copyIndex()]]",
+        "priority": "[add(copyIndex(), 1)]"
+      },
+      "dependsOn": [
+        "[concat('Microsoft.Network/trafficManagerProfiles/', variables('trafficManagerDnsName'))]"
+      ],
+      "copy": {
+        "name": "app1TrafficManagerEndpointsBcpLoop",
+        "count": "[variables('environmentVariable').bcpLoop]"
+      }
+    }
+  ]
+}
